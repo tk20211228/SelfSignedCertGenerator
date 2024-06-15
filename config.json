@@ -1,0 +1,20 @@
+{
+  "root": {
+    "name": "test-rootCA",
+    "domain": "test-root-ca.com",
+    "password": "test123!!",
+    "friend": "test-root-ca-friend"
+  },
+  "ca": {
+    "name": "test-CA",
+    "domain": "test-ca.com",
+    "password": "test123!!",
+    "friend": "test-ca-friend"
+  },
+  "client": {
+    "name": "test-client",
+    "domain": "test-client.com",
+    "password": "test123!!",
+    "friend": "test-client-friend"
+  }
+}
