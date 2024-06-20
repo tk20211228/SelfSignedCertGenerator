@@ -27,7 +27,8 @@ function New-SelfSignedCertificateWrapper {
     [string]$logPath,
     [string]$type, # CA or Client
     [string]$pass,
-    [string]$logFilePath
+    [string]$logFilePath,
+    [String]$fileName 
   )
 
   $certificate = New-SelfSignedCertificate @params
@@ -39,14 +40,14 @@ function New-SelfSignedCertificateWrapper {
   New-Item -ItemType Directory -Path $exportPath | Out-Null
 
   # pause
-  Export-PfxCertificate -Cert $certificate -FilePath "$exportPath\My${type}Cert.pfx" -Password $certPassword | Out-Null
-  Export-PfxCertificate -Cert $certificate -FilePath "$exportPath\My${type}Cert.p12" -Password $certPassword | Out-Null
+  Export-PfxCertificate -Cert $certificate -FilePath "$exportPath\$($fileName)-${type}Cert.pfx" -Password $certPassword | Out-Null
+  Export-PfxCertificate -Cert $certificate -FilePath "$exportPath\$($fileName)-${type}Cert.p12" -Password $certPassword | Out-Null
 
-  Export-Certificate -Cert $certificate -FilePath "$exportPath\My${type}Cert.cer" | Out-Null
-  $certContent = Get-Content -Path "$exportPath\My${type}Cert.cer" -Encoding Byte
+  Export-Certificate -Cert $certificate -FilePath "$exportPath\$($fileName)-${type}Cert.cer" | Out-Null
+  $certContent = Get-Content -Path "$exportPath\$($fileName)-${type}Cert.cer" -Encoding Byte
   $pemContent = [System.Convert]::ToBase64String($certContent)
   $pemContent = "-----BEGIN CERTIFICATE-----`n" + ($pemContent -replace "(.{64})", "`$1`n") + "`n-----END CERTIFICATE-----"
-  $pemContent | Out-File -FilePath "$exportPath\My${type}Cert.pem" -Encoding ASCII
+  $pemContent | Out-File -FilePath "$exportPath\$($fileName)-${type}Cert.pem" -Encoding ASCII
 
   return $certificate
 }
@@ -100,9 +101,8 @@ function Main {
       HashAlgorithm     = "SHA256"
       NotAfter          = (Get-Date).AddYears(10)
     }
-    $rootCACert = New-SelfSignedCertificateWrapper -params $rootCertParams -logPath $logDirectory -type "rootCA" -pass $config.root.password -logFilePath $logFilePath
+    $rootCACert = New-SelfSignedCertificateWrapper -params $rootCertParams -logPath $logDirectory -type "rootCA" -pass $config.root.password -logFilePath $logFilePath -fileName $config.root.name
 
-    # $rootCert = New-SelfSignedCertificate -CertStoreLocation Cert:\CurrentUser\My -DnsName "RootCA" -TextExtension @("2.5.29.19={text}CA=true") -KeyUsage CertSign, CrlSign, DigitalSignature
     "rootCACertType: $($rootCACert.GetType().FullName)" | Out-File -FilePath $logFilePath -Append
 
     # CA証明書のパラメータ
@@ -122,7 +122,7 @@ function Main {
   
     # 証明書を作成
     # pause
-    $CACert = New-SelfSignedCertificateWrapper -params $caParams -logPath $logDirectory -type "CA" -pass $config.ca.password -logFilePath $logFilePath
+    $CACert = New-SelfSignedCertificateWrapper -params $caParams -logPath $logDirectory -type "CA" -pass $config.ca.password -logFilePath $logFilePath $logFilePath -fileName $config.ca.name
     "CACertType: $($CACert.GetType().FullName)" | Out-File -FilePath $logFilePath -Append    
     
     # pause
@@ -140,14 +140,14 @@ function Main {
       Signer            = $CACert
       NotAfter          = (Get-Date).AddYears(5)
     }
-    New-SelfSignedCertificateWrapper -params $clientParams -logPath $logDirectory -type "Client" -pass $config.client.password -logFilePath $logFilePath
+    New-SelfSignedCertificateWrapper -params $clientParams -logPath $logDirectory -type "Client" -pass $config.client.password -logFilePath $logFilePath $logFilePath -fileName $config.client.name
 
     
     $csvFilePath = Join-Path -Path $logDirectory -ChildPath "upload.csv"
     "Local File Path,Password" | Out-File -FilePath $csvFilePath -Append -Encoding UTF8
-    "$($logDirectory)\rootCA\MyrootCACert.cer," | Out-File -FilePath $csvFilePath -Append -Encoding UTF8
-    "$logDirectory\CA\MyCACert.pfx,$($config.ca.password)" | Out-File -FilePath $csvFilePath -Append -Encoding UTF8
-    "$logDirectory\Client\MyClientCert.p12,$($config.client.password)" | Out-File -FilePath $csvFilePath -Append -Encoding UTF8
+    "$logDirectory\rootCA\$($config.root.name)-rootCACert.cer," | Out-File -FilePath $csvFilePath -Append -Encoding UTF8
+    "$logDirectory\CA\$($config.root.name)-CACert.pfx,$($config.ca.password)" | Out-File -FilePath $csvFilePath -Append -Encoding UTF8
+    "$logDirectory\Client\$($config.root.name)-ClientCert.p12,$($config.client.password)" | Out-File -FilePath $csvFilePath -Append -Encoding UTF8
 
     # storeに保存証明書の削除
     $rootCACertificate = Get-ChildItem -Path "Cert:\CurrentUser\My" | Where-Object { $_.Subject -like "*$rootCAName*" }
