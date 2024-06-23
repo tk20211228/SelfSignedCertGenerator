@@ -1,20 +1,26 @@
 {
   "root": {
     "name": "test-rootCA",
-    "domain": "test-root-ca.com",
     "password": "test123!!",
-    "friend": "test-root-ca-friend"
+    "friend": "test-root-ca-friend",
+    "subjectAlternativeName": ["test-root-ca.com","www.test-root-ca.com"]
   },
   "ca": {
     "name": "test-CA",
-    "domain": "test-ca.com",
+    "subjectAlternativeName": ["test-ca.com","www.test-ca.com"],
     "password": "test123!!",
     "friend": "test-ca-friend"
   },
   "client": {
-    "name": "test-client",
-    "domain": "test-client.com",
     "password": "test123!!",
-    "friend": "test-client-friend"
+    "friend": "test-client-friend",
+    "subjectAlternativeName": ["test-client.com","www.test-client.com"],
+    "subject": {
+      "CN":"test-client",
+      "O":"Example Inc.",
+      "L":"Osaka-Shi",
+      "ST":"Osaka",
+      "C":"JP"
+    }
   }
 }

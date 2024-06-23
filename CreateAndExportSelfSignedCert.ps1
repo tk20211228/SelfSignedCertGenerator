@@ -92,8 +92,9 @@ function Main {
     # ルートCA証明書の作成
     $rootCAName = "$($config.root.name)_$(Get-Timestamp)"
     $rootCertParams = @{
+      Subject           = "CN=$rootCAName, O=YourOrganization, C=YourCountry"
+      DnsName           = $config.root.subjectAlternativeName
       CertStoreLocation = "Cert:\CurrentUser\My"
-      DnsName           = $rootCAName
       TextExtension     = @("2.5.29.19={text}CA=true")
       KeyUsage          = @("CertSign", "CRLSign", "DigitalSignature")
       KeyLength         = 4096
@@ -101,7 +102,7 @@ function Main {
       HashAlgorithm     = "SHA256"
       NotAfter          = (Get-Date).AddYears(10)
     }
-    $rootCACert = New-SelfSignedCertificateWrapper -params $rootCertParams -logPath $logDirectory -type "rootCA" -pass $config.root.password -logFilePath $logFilePath -fileName $config.root.name
+    $rootCACert = New-SelfSignedCertificateWrapper -params $rootCertParams -logPath $logDirectory -type "rootCA" -pass $config.root.password -logFilePath $logFilePath -fileName $rootCAName
 
     "rootCACertType: $($rootCACert.GetType().FullName)" | Out-File -FilePath $logFilePath -Append
 
@@ -109,6 +110,7 @@ function Main {
     $CAName = "$($config.ca.name)_$(Get-Timestamp)"
     $caParams = @{
       Subject           = "CN=$CAName, O=YourOrganization, C=YourCountry"
+      DnsName           = $config.ca.subjectAlternativeName
       KeyExportPolicy   = "Exportable"
       KeySpec           = "Signature"
       KeyLength         = 4096
@@ -122,14 +124,19 @@ function Main {
   
     # 証明書を作成
     # pause
-    $CACert = New-SelfSignedCertificateWrapper -params $caParams -logPath $logDirectory -type "CA" -pass $config.ca.password -logFilePath $logFilePath $logFilePath -fileName $config.ca.name
+    $CACert = New-SelfSignedCertificateWrapper -params $caParams -logPath $logDirectory -type "CA" -pass $config.ca.password -logFilePath $logFilePath $logFilePath -fileName $CAName
     "CACertType: $($CACert.GetType().FullName)" | Out-File -FilePath $logFilePath -Append    
     
     # pause
     # Cient証明書のパラメータ
-    $clientName = "$($config.client.name)_$(Get-Timestamp)"
+    $clientName = "$($config.client.subject.CN)_$(Get-Timestamp)"
+    # $clientSubject = @($config.client.subject) | ForEach-Object { "$($_.Key)=$($_.Value)" } -join ", "
+    $clientSubject = ($config.client.subject.PSObject.Properties | ForEach-Object { "$($_.Name)=$($_.Value)" }) -join ", "
+
     $clientParams = @{
-      Subject           = "CN=$clientName"
+      # Subject           = "CN=$clientName"
+      Subject           = $clientSubject
+      DnsName           = $config.client.subjectAlternativeName
       KeyExportPolicy   = "Exportable"
       KeySpec           = "Signature"
       KeyLength         = 2048
@@ -140,8 +147,7 @@ function Main {
       Signer            = $CACert
       NotAfter          = (Get-Date).AddYears(5)
     }
-    New-SelfSignedCertificateWrapper -params $clientParams -logPath $logDirectory -type "Client" -pass $config.client.password -logFilePath $logFilePath $logFilePath -fileName $config.client.name
-
+    New-SelfSignedCertificateWrapper -params $clientParams -logPath $logDirectory -type "Client" -pass $config.client.password -logFilePath $logFilePath $logFilePath -fileName $clientName
     
     $csvFilePath = Join-Path -Path $logDirectory -ChildPath "upload.csv"
     "Local File Path,Password" | Out-File -FilePath $csvFilePath -Append -Encoding UTF8
@@ -154,7 +160,7 @@ function Main {
     Remove-Item -Path "Cert:\CurrentUser\My\$($rootCACertificate.Thumbprint)" -DeleteKey
     $caCertificate = Get-ChildItem -Path "Cert:\CurrentUser\My" | Where-Object { $_.Subject -Match $CAName }
     Remove-Item -Path "Cert:\CurrentUser\My\$($caCertificate.Thumbprint)" -DeleteKey
-    $clientCertificate = Get-ChildItem -Path "Cert:\CurrentUser\My" | Where-Object { $_.Subject -Match $clientName }
+    $clientCertificate = Get-ChildItem -Path "Cert:\CurrentUser\My" | Where-Object { $_.Subject -Match $config.client.subject.CN }
     Remove-Item -Path "Cert:\CurrentUser\My\$($clientCertificate.Thumbprint)" -DeleteKey
 
     pause
